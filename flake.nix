@@ -31,71 +31,76 @@
     };
   };
 
-  outputs = {
-    nixpkgs,
-    uv2nix,
-    pyproject-nix,
-    pyproject-build-systems,
-    flake-utils,
-    ...
-  }:
-    flake-utils.lib.eachDefaultSystem (system: let
-      pkgs = import nixpkgs {inherit system;};
+  outputs =
+    {
+      nixpkgs,
+      uv2nix,
+      pyproject-nix,
+      pyproject-build-systems,
+      flake-utils,
+      ...
+    }:
+    flake-utils.lib.eachDefaultSystem (
+      system:
+      let
+        pkgs = import nixpkgs { inherit system; };
 
-      inherit (pkgs) lib;
+        inherit (pkgs) lib;
 
-      workspace = uv2nix.lib.workspace.loadWorkspace {workspaceRoot = ./.;};
+        workspace = uv2nix.lib.workspace.loadWorkspace { workspaceRoot = ./.; };
 
-      overlay = workspace.mkPyprojectOverlay {
-        sourcePreference = "wheel"; # or sourcePreference = "sdist";
-      };
+        overlay = workspace.mkPyprojectOverlay {
+          sourcePreference = "wheel"; # or sourcePreference = "sdist";
+        };
 
-      pyprojectOverrides = _final: _prev: {};
+        pyprojectOverrides = _final: _prev: { };
 
-      python = pkgs.python311;
+        python = pkgs.python311;
 
-      pythonSet =
-        (pkgs.callPackage pyproject-nix.build.packages {
-          inherit python;
-        }).overrideScope
-        (
-          lib.composeManyExtensions [
-            pyproject-build-systems.overlays.default
-            overlay
-            pyprojectOverrides
-          ]
-        );
-    in rec {
-      formatter = pkgs.alejandra;
+        pythonSet =
+          (pkgs.callPackage pyproject-nix.build.packages {
+            inherit python;
+          }).overrideScope
+            (
+              lib.composeManyExtensions [
+                pyproject-build-systems.overlays.default
+                overlay
+                pyprojectOverrides
+              ]
+            );
+      in
+      rec {
+        formatter = pkgs.alejandra;
 
-      packages = {
-        serena = pythonSet.mkVirtualEnv "serena" workspace.deps.default;
-        default = packages.serena;
-      };
+        packages = {
+          serena = pythonSet.mkVirtualEnv "serena" workspace.deps.default;
+          default = packages.serena;
+        };
 
-      apps.default = {
-        type = "app";
-        program = "${packages.default}/bin/serena";
-      };
+        apps.default = {
+          type = "app";
+          program = "${packages.default}/bin/serena";
+        };
 
-      devShells = {
-        default = pkgs.mkShell {
-          packages = [
-            python
-            pkgs.uv
-          ];
-          env =
-            {
+        devShells = {
+          default = pkgs.mkShell {
+            packages = [
+              python
+              pkgs.uv
+              pkgs.ruff
+            ];
+            env = {
               UV_PYTHON_DOWNLOADS = "never";
               UV_PYTHON = python.interpreter;
             }
             // lib.optionalAttrs pkgs.stdenv.isLinux {
               LD_LIBRARY_PATH = lib.makeLibraryPath pkgs.pythonManylinuxPackages.manylinux1;
             };
-          shellHook = ''
-            unset PYTHONPATH
-          '';
+            shellHook = ''
+              unset PYTHONPATH
+            '';
+          };
         };
-      };
-    });
+      }
+    );
 }
