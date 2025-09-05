@@ -994,9 +994,39 @@ class SolidLanguageServer(ABC):
                     self.logger.log(f"No cache hit for symbols with {include_body=} in {relative_file_path}", logging.DEBUG)
 
             self.logger.log(f"Requesting document symbols for {relative_file_path} from the Language Server", logging.DEBUG)
-            response = self.server.send.document_symbol(
-                {"textDocument": {"uri": pathlib.Path(os.path.join(self.repository_root_path, relative_file_path)).as_uri()}}
-            )
+            full_path = os.path.join(self.repository_root_path, relative_file_path)
+            uri = pathlib.Path(full_path).as_uri()
+            
+            print(f"DEBUG PATH: Requesting symbols for file: {full_path}")  # DEBUG
+            print(f"DEBUG URI: URI: {uri}")  # DEBUG
+            print(f"DEBUG EXISTS: File exists: {os.path.exists(full_path)}")  # DEBUG
+            
+            # Try sending didOpen notification first - HLS might need this
+            try:
+                with open(full_path, 'r') as f:
+                    file_content = f.read()
+                self.server.send_notification(
+                    "textDocument/didOpen", 
+                    {
+                        "textDocument": {
+                            "uri": uri,
+                            "languageId": "haskell", 
+                            "version": 1,
+                            "text": file_content
+                        }
+                    }
+                )
+                print("DEBUG DIDOPEN: Sent didOpen notification to HLS")  # DEBUG
+                # Give HLS a moment to process the file
+                import time
+                time.sleep(1)
+                print("DEBUG DIDOPEN: Waited 1s after didOpen")  # DEBUG
+            except Exception as e:
+                print(f"DEBUG DIDOPEN ERROR: {e}")  # DEBUG
+            
+            request_params = {"textDocument": {"uri": uri}}
+            response = self.server.send.document_symbol(request_params)
+            print(f"DEBUG SYMBOLS: HLS returned response type: {type(response)}, content: {response}")  # DEBUG
             if response is None:
                 self.logger.log(
                     f"Received None response from the Language Server for document symbols in {relative_file_path}. "

@@ -185,6 +185,7 @@ class HaskellLanguageServer(SolidLanguageServer):
                     "documentSymbol": {
                         "dynamicRegistration": True,
                         "hierarchicalDocumentSymbolSupport": True,
+                        "symbolKind": {"valueSet": list(range(1, 27))},
                     },
                     "hover": {"dynamicRegistration": True},
                     "formatting": {"dynamicRegistration": True},
@@ -227,8 +228,13 @@ class HaskellLanguageServer(SolidLanguageServer):
         )
         init_response = self.server.send.initialize(initialize_params)
 
-        # Verify a few basic capabilities
+        # Verify essential capabilities
         assert "textDocumentSync" in init_response["capabilities"], "HLS missing textDocumentSync capability"
+        assert "documentSymbolProvider" in init_response["capabilities"], "HLS missing documentSymbolProvider capability"
+        
+        # Log capabilities for debugging
+        self.logger.log(f"HLS capabilities: {list(init_response['capabilities'].keys())}", logging.INFO)
+        print(f"DEBUG: HLS returned capabilities: {list(init_response['capabilities'].keys())}")
 
         self.server.notify.initialized({})
         self.completions_available.set()
